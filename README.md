@@ -15,6 +15,8 @@ runs on: an app database over CDC, Stripe, Shopify, Amazon settlements, App
 Store sales reports, an ad platform, and the AI evaluation jobs behind
 transcription, summarization, speaker mapping and assistant answers.
 
+![Status page](docs/status-page.png)
+
 ## What it does
 
 | State | Meaning | How it is decided |
@@ -54,7 +56,7 @@ python -m pip install -r requirements.txt
 python -m obs.cli --offline seed
 python -m obs.cli --offline check
 $env:OBS_BACKEND = "offline"
-streamlit run app/status_app.py
+python -m streamlit run app/status_app.py   # `streamlit` alone needs the user Scripts dir on PATH
 ```
 
 Against ClickHouse:
