@@ -1,0 +1,27 @@
+# The monitor itself. Runs against ClickHouse every 15 minutes and fails the
+# run when a source is late, missing, partial or anomalous, so the alert exists
+# even before a pager is wired up.
+name: freshness
+on:
+  schedule: [{ cron: "*/15 * * * *" }]
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        ports: ["8123:8123"]
+    env:
+      CLICKHOUSE_HOST: localhost
+      CLICKHOUSE_PORT: "8123"
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt
+      - run: python -m obs.cli migrate
+      - run: python -m obs.cli seed          # replace with your real load-event feed
+      - run: python -m obs.cli registry-audit
+      - run: python -m obs.cli check --fail-on-alert

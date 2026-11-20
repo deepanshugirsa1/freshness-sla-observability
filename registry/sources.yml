@@ -1,0 +1,119 @@
+# Per-source registry. Every source has an owner, a cadence, a freshness target
+# and an alert severity. A source absent from this file is not monitored, and an
+# unmonitored source is treated as a failure by `obs registry-audit`.
+defaults:
+  partial_load_ratio: 0.60      # rows < 60% of the 14-day median => partial
+  anomaly_mad_threshold: 4.0    # robust z-score (MAD) above this => anomaly
+  grace_minutes: 15             # tolerance on top of the freshness target
+
+sources:
+  - name: app_db.users
+    domain: product
+    owner: data-eng
+    system: postgres_cdc
+    cadence: 15m
+    freshness_target_minutes: 45
+    severity: critical
+    downstream: [dim_user, funnel_daily, retention_cohorts]
+
+  - name: app_db.devices
+    domain: product
+    owner: data-eng
+    system: postgres_cdc
+    cadence: 15m
+    freshness_target_minutes: 45
+    severity: critical
+    downstream: [dim_device, activation_daily]
+
+  - name: stripe.charges
+    domain: revenue
+    owner: data-eng
+    system: stripe_api
+    cadence: 1h
+    freshness_target_minutes: 180
+    severity: critical
+    downstream: [fct_payment, revenue_daily, mrr_movement]
+
+  - name: stripe.subscriptions
+    domain: revenue
+    owner: data-eng
+    system: stripe_api
+    cadence: 1h
+    freshness_target_minutes: 180
+    severity: critical
+    downstream: [fct_subscription, mrr_movement, churn_monthly]
+
+  - name: shopify.orders
+    domain: commerce
+    owner: data-eng
+    system: shopify_api
+    cadence: 1h
+    freshness_target_minutes: 240
+    severity: high
+    downstream: [fct_order, revenue_daily, unit_economics]
+
+  - name: amazon.settlements
+    domain: commerce
+    owner: finance-eng
+    system: sp_api
+    cadence: 1d
+    freshness_target_minutes: 2880   # SP-API settlements restate; 48h target
+    severity: high
+    restating: true
+    downstream: [fct_order, revenue_daily]
+
+  - name: app_store.sales_reports
+    domain: revenue
+    owner: data-eng
+    system: app_store_connect
+    cadence: 1d
+    freshness_target_minutes: 2160   # reports land late and restate for ~36h
+    severity: high
+    restating: true
+    downstream: [fct_subscription, mrr_movement]
+
+  - name: ad_platform.spend
+    domain: marketing
+    owner: growth-eng
+    system: ads_api
+    cadence: 1d
+    freshness_target_minutes: 2160
+    severity: medium
+    restating: true
+    downstream: [cac_daily, attribution_touchpoints]
+
+  - name: ai.transcription_quality
+    domain: ai_quality
+    owner: ml-eng
+    system: eval_job
+    cadence: 1h
+    freshness_target_minutes: 120
+    severity: critical
+    downstream: [ai_quality_daily, transcription_wer_trend]
+
+  - name: ai.summary_quality
+    domain: ai_quality
+    owner: ml-eng
+    system: eval_job
+    cadence: 1h
+    freshness_target_minutes: 120
+    severity: high
+    downstream: [ai_quality_daily]
+
+  - name: ai.speaker_mapping_accuracy
+    domain: ai_quality
+    owner: ml-eng
+    system: eval_job
+    cadence: 1d
+    freshness_target_minutes: 1440
+    severity: high
+    downstream: [ai_quality_daily]
+
+  - name: ai.ask_pocket_answers
+    domain: ai_quality
+    owner: ml-eng
+    system: eval_job
+    cadence: 1h
+    freshness_target_minutes: 180
+    severity: high
+    downstream: [ask_pocket_quality_daily]
