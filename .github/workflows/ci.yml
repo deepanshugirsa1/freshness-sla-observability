@@ -15,4 +15,4 @@ jobs:
       - name: Registry must have an owner and a target for every source
         run: python -m obs.cli --offline migrate && python -m obs.cli --offline registry-audit
       - name: Smoke the check loop end to end
-        run: python -m obs.cli --offline seed && python -m obs.cli --offline check
+        run: python -m obs.cli --offline seed && python -m obs.cli --offline ingest-jira && python -m obs.cli --offline check

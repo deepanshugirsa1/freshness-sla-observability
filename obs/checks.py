@@ -54,6 +54,15 @@ def _median(values: list[int]) -> float | None:
     return statistics.median(values) if values else None
 
 
+# A low-volume source (a Jira pull of a few dozen rows, a daily settlement
+# file) can sit at the same row count for days, which drives MAD to zero. The
+# old guard then scored any deviation as infinite and paged on a one-row
+# change. Fall back to a relative band instead: scale the deviation by the
+# median, so "8 rows instead of 9" stays quiet and "8 rows instead of 80"
+# does not.
+ZERO_MAD_RELATIVE_TOLERANCE = 0.25
+
+
 def _mad_score(value: int, history: list[int]) -> float | None:
     """Robust z-score. Median absolute deviation survives one bad day; stdev does not."""
     if len(history) < 5:
@@ -61,7 +70,14 @@ def _mad_score(value: int, history: list[int]) -> float | None:
     med = statistics.median(history)
     mad = statistics.median([abs(h - med) for h in history])
     if mad == 0:
-        return 0.0 if value == med else float("inf")
+        if med == 0:
+            return 0.0 if value == 0 else float("inf")
+        relative = abs(value - med) / med
+        if relative <= ZERO_MAD_RELATIVE_TOLERANCE:
+            return 0.0
+        # Express the relative miss on the same scale as the threshold, so one
+        # knob (anomaly_mad_threshold) still governs sensitivity.
+        return relative / ZERO_MAD_RELATIVE_TOLERANCE
     return abs(value - med) / (1.4826 * mad)
 
 

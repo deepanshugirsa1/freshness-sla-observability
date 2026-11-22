@@ -3,3 +3,4 @@ __pycache__/
 .obs_offline.json
 .pytest_cache/
 .venv/
+.obs_watermarks.json

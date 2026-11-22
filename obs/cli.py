@@ -7,6 +7,7 @@ Add --offline to any command to run without a ClickHouse server.
     python -m obs.cli migrate          create the ClickHouse schema
     python -m obs.cli seed             load 21 days of demo history (with faults)
     python -m obs.cli check            evaluate every source, record, alert
+    python -m obs.cli ingest-jira      pull Jira issues, changelog and worklogs
     python -m obs.cli registry-audit   fail if a landing source has no owner
     python -m obs.cli report           print the current state table
 """
@@ -17,6 +18,7 @@ import sys
 from datetime import datetime, timezone
 
 from . import alerts, checks, registry as reg, seed as seeder
+from .sources import jira
 from . import store as ch_store
 from . import store_memory
 
@@ -66,6 +68,24 @@ def cmd_check(args):
     return 0
 
 
+def cmd_ingest_jira(args):
+    """Land one incremental Jira batch, then let the usual checks judge it.
+
+    Credentials come from JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN. Without
+    them the connector reads fixtures/jira_issues.json, so the path runs in CI.
+    """
+    store = backend(args)
+    ch = store.client()
+    store.migrate(ch)
+    events, reports = jira.ingest(project=args.project)
+    store.insert_events(ch, events)
+    for report in reports:
+        print(report.summary())
+    for event in events:
+        print(f"landed {event.rows:>6} rows  {event.source}")
+    return 0
+
+
 def cmd_registry_audit(args):
     registry = _load(args.registry)
     store = backend(args)
@@ -104,6 +124,8 @@ def main(argv=None):
     s.set_defaults(fn=cmd_seed)
     c = sub.add_parser("check"); c.add_argument("--fail-on-alert", action="store_true")
     c.set_defaults(fn=cmd_check)
+    j = sub.add_parser("ingest-jira"); j.add_argument("--project", default="DATA")
+    j.set_defaults(fn=cmd_ingest_jira)
     sub.add_parser("registry-audit").set_defaults(fn=cmd_registry_audit)
     sub.add_parser("report").set_defaults(fn=cmd_report)
     args = p.parse_args(argv)

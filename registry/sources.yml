@@ -117,3 +117,34 @@ sources:
     freshness_target_minutes: 180
     severity: high
     downstream: [ask_pocket_quality_daily]
+
+  # Non-platform (enterprise application) sources. Landed by obs.sources.*,
+  # monitored on exactly the same terms as CDC and vendor-API sources.
+  - name: jira.issues
+    domain: enterprise_apps
+    owner: data-eng
+    system: jira_api
+    cadence: 1h
+    freshness_target_minutes: 180
+    severity: high
+    restating: true            # issues are edited retroactively; watermark rewinds
+    downstream: [dim_jira_issue, fct_issue_transition, delivery_throughput_weekly]
+
+  - name: jira.changelog
+    domain: enterprise_apps
+    owner: data-eng
+    system: jira_api
+    cadence: 1h
+    freshness_target_minutes: 180
+    severity: medium
+    downstream: [fct_issue_transition, cycle_time_weekly]
+
+  - name: jira.worklogs
+    domain: enterprise_apps
+    owner: finance-eng
+    system: jira_api
+    cadence: 1d
+    freshness_target_minutes: 1440
+    severity: medium
+    restating: true
+    downstream: [fct_worklog, engineering_cost_allocation]

@@ -110,3 +110,20 @@ def test_real_registry_loads_and_validates():
     r = reg.load("registry/sources.yml")
     assert len(r) >= 10
     assert all(s.owner and s.downstream for s in r)
+
+
+# --- constant-volume sources (zero MAD) -----------------------------------
+
+def test_constant_volume_source_tolerates_small_wobble():
+    """A low-volume source sitting at the same count must not page on one row."""
+    events = history(n=20, rows=8)
+    events[-1].rows = 9
+    assert evaluate_source(src(cadence="1d", freshness_target_minutes=1440),
+                           events, now=NOW).state == OK
+
+
+def test_constant_volume_source_still_catches_a_collapse():
+    events = history(n=20, rows=80)
+    events[-1].rows = 8
+    assert evaluate_source(src(cadence="1d", freshness_target_minutes=1440),
+                           events, now=NOW).state in {ANOMALY, PARTIAL}
