@@ -14,6 +14,9 @@ BASE_ROWS = {
     "app_store.sales_reports": 9_800, "ad_platform.spend": 640,
     "ai.transcription_quality": 14_000, "ai.summary_quality": 13_200,
     "ai.speaker_mapping_accuracy": 7_500, "ai.ask_pocket_answers": 4_300,
+    # Matched to fixtures/jira_issues.json so a seeded history and a real
+    # offline ingest agree; a truncated page then shows as genuinely partial.
+    "jira.issues": 18, "jira.changelog": 25, "jira.worklogs": 8,
 }
 
 # Planted faults, so a fresh clone shows a status page with real findings.

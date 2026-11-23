@@ -42,8 +42,9 @@ Offline, no server needed:
 
 ```bash
 pip install -r requirements.txt
-python -m obs.cli --offline seed      # 21 days of history, with faults planted
-python -m obs.cli --offline check     # evaluate, record, alert
+python -m obs.cli --offline seed         # 21 days of history, with faults planted
+python -m obs.cli --offline ingest-jira  # land a Jira batch from the fixture
+python -m obs.cli --offline check        # evaluate, record, alert
 OBS_BACKEND=offline streamlit run app/status_app.py
 ```
 
@@ -109,6 +110,47 @@ new pipelines cannot quietly arrive unwatched.
 A target tighter than its own cadence is rejected at load time, because a
 target that can never pass is the most common way monitoring becomes noise.
 
+## Non-platform sources: Jira
+
+Platform data arrives through CDC and vendor APIs the warehouse already knows
+how to land. Enterprise applications do not — each has its own auth, its own
+pagination, its own idea of a timestamp, and administrators who add fields
+without telling anyone. `obs/sources/` handles those four facts so an
+enterprise app lands on the same terms as everything else in the registry.
+
+```bash
+python -m obs.cli --offline ingest-jira          # reads fixtures/jira_issues.json
+JIRA_BASE_URL=... JIRA_EMAIL=... JIRA_API_TOKEN=... \
+  python -m obs.cli ingest-jira --project DATA   # live, incremental
+```
+
+One pull produces three data products at three grains: `jira.issues` (one row
+per issue, current state), `jira.changelog` (one row per field transition) and
+`jira.worklogs` (one row per logged entry). Each lands a load event, so a
+stalled connector shows up on the status page next to a late Stripe pull with
+the same severity rules and the same owner on the hook.
+
+**Incremental, with a rewind.** Pulls run `updated >= watermark` against a
+stored high-water mark. The watermark rewinds 30 minutes on every run, because
+Jira issues and worklogs are edited retroactively — without the rewind, a late
+edit lands inside a window that has already been pulled and is never seen
+again. Re-ingesting a window is safe: rows are deduplicated on the primary key,
+last write wins.
+
+**Schema drift is classified, not feared.** A declared contract names the
+fields downstream models depend on, their types, and which may never be null.
+Before anything lands, the batch is checked against it:
+
+| Drift | Response |
+|---|---|
+| a new `customfield_*` | lands in `custom_fields`; promoted to a column when someone models it |
+| a new plain field | recorded in the drift report, load proceeds |
+| a declared field missing | fatal if required — models break either way, so fail at ingestion where it is cheap |
+| a declared field retyped | always fatal — this is the one that corrupts marts without failing a load |
+
+Nothing in `contract.py` is Jira-specific. Onboarding the next enterprise
+application means declaring its contract, not writing another drift checker.
+
 ## Why ClickHouse
 
 Load events are append-only, high cardinality, and always queried as "latest
@@ -135,8 +177,11 @@ obs/store.py              ClickHouse schema and queries
 obs/store_memory.py       file-backed stand-in for --offline runs and CI
 obs/alerts.py             severity-tiered routing and formatting
 obs/seed.py               21 days of demo history with five planted faults
+obs/sources/contract.py   source contracts and drift classification (any app)
+obs/sources/jira.py       Jira issues, changelog and worklogs connector
+fixtures/                 recorded Jira payload, so CI runs without credentials
 app/status_app.py         Streamlit status page
-tests/                    15 tests over the check logic and registry rules
+tests/                    34 tests over check logic, registry rules and ingestion
 .github/workflows/        CI, plus the 15-minute freshness monitor
 ```
 
